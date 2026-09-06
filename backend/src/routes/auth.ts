@@ -9,44 +9,48 @@ const router = Router();
 
 // ── Passport Google Strategy ──────────────────────────────────────────────────
 
-passport.use(
-  new GoogleStrategy(
-    {
-      clientID:     config.google.clientId,
-      clientSecret: config.google.clientSecret,
-      callbackURL:  config.google.callbackUrl,
-    },
-    async (
-      _accessToken: string,
-      _refreshToken: string,
-      profile: Profile,
-      done: (err: any, user?: User | false) => void
-    ) => {
-      try {
-        const email     = profile.emails?.[0]?.value ?? '';
-        const name      = profile.displayName ?? '';
-        const avatarUrl = profile.photos?.[0]?.value ?? null;
-        const googleId  = profile.id;
+const googleStrategy = new GoogleStrategy(
+  {
+    clientID:     config.google.clientId,
+    clientSecret: config.google.clientSecret,
+    callbackURL:  config.google.callbackUrl,
+  },
+  async (
+    _accessToken: string,
+    _refreshToken: string,
+    profile: Profile,
+    done: (err: any, user?: User | false) => void
+  ) => {
+    try {
+      const email     = profile.emails?.[0]?.value ?? '';
+      const name      = profile.displayName ?? '';
+      const avatarUrl = profile.photos?.[0]?.value ?? null;
+      const googleId  = profile.id;
 
-        // Upsert: create user if new, otherwise update name/avatar
-        const result = await query<User>(
-          `INSERT INTO users (email, name, avatar_url, google_id)
-           VALUES ($1, $2, $3, $4)
-           ON CONFLICT (google_id) DO UPDATE
-             SET name       = EXCLUDED.name,
-                 avatar_url = EXCLUDED.avatar_url,
-                 updated_at = NOW()
-           RETURNING *`,
-          [email, name, avatarUrl, googleId]
-        );
+      // Upsert: create user if new, otherwise update name/avatar
+      const result = await query<User>(
+        `INSERT INTO users (email, name, avatar_url, google_id)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (google_id) DO UPDATE
+           SET name       = EXCLUDED.name,
+               avatar_url = EXCLUDED.avatar_url,
+               updated_at = NOW()
+         RETURNING *`,
+        [email, name, avatarUrl, googleId]
+      );
 
-        return done(null, result.rows[0]);
-      } catch (err) {
-        return done(err as Error);
-      }
+      return done(null, result.rows[0]);
+    } catch (err) {
+      return done(err as Error);
     }
-  )
+  }
 );
+
+// FIX: Google deprecated query-string access tokens. Force Bearer Authorization header.
+(googleStrategy as any)._oauth2.useAuthorizationHeaderforGET(true);
+
+passport.use(googleStrategy);
+
 
 passport.serializeUser((user: any, done) => {
   done(null, user.id);
