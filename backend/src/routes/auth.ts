@@ -84,12 +84,25 @@ router.get(
     req.session.userId = (req.user as User).id;
 
     // IMPORTANT: explicitly save the session before redirecting.
-    // Without this call, there is a race condition: the browser follows
-    // the redirect and immediately fires GET /auth/me (and other API calls)
-    // before express-session's async write to Redis completes, causing 401.
+    // We serve an HTML page from this backend domain (same origin as the cookie)
+    // with a meta-refresh to the frontend. This prevents modern browsers
+    // (Safari/Firefox/Chrome) from blocking the session cookie as a
+    // "third-party cookie" when it is set via a cross-origin 302 redirect.
     req.session.save((err) => {
       if (err) return next(err);
-      res.redirect(`${config.frontendUrl}/dashboard/scheduled`);
+      const dashboardUrl = `${config.frontendUrl}/dashboard/scheduled`;
+      res.send(`<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="refresh" content="0;url=${dashboardUrl}" />
+    <title>Signing in…</title>
+  </head>
+  <body>
+    <p>Signing in… <a href="${dashboardUrl}">Click here if not redirected.</a></p>
+    <script>window.location.replace(${JSON.stringify(dashboardUrl)});</script>
+  </body>
+</html>`);
     });
   }
 );
