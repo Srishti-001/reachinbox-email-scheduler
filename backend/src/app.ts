@@ -28,6 +28,9 @@ import slackRoutes    from './routes/slack';
 
 const app = express();
 
+// Trust the Railway load balancer so secure cookies can be set
+app.set('trust proxy', 1);
+
 // ── Core middleware ───────────────────────────────────────────────────────────
 
 app.use(
