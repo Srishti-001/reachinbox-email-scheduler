@@ -83,13 +83,15 @@ router.get(
     // Store user id in express-session for subsequent API calls.
     req.session.userId = (req.user as User).id;
 
-    // IMPORTANT: explicitly save the session before redirecting.
-    // We serve an HTML page from this backend domain (same origin as the cookie)
-    // with a meta-refresh to the frontend. This prevents modern browsers
-    // (Safari/Firefox/Chrome) from blocking the session cookie as a
-    // "third-party cookie" when it is set via a cross-origin 302 redirect.
+    // DIAGNOSTIC: log session ID prefix and userId (no secret values)
+    console.log(`[OAuth CB] sessionID=${req.sessionID?.slice(0,8)}… userId=${req.session.userId} userPresent=${!!(req.user)}`);
+
     req.session.save((err) => {
-      if (err) return next(err);
+      if (err) {
+        console.error('[OAuth CB] session.save ERROR:', err);
+        return next(err);
+      }
+      console.log('[OAuth CB] session.save OK — sending trampoline');
       const dashboardUrl = `${config.frontendUrl}/dashboard/scheduled`;
       res.send(`<!DOCTYPE html>
 <html>
@@ -126,6 +128,9 @@ router.post('/logout', destroySession);
 /** GET /auth/me — returns the current authenticated user */
 router.get('/me', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // DIAGNOSTIC: log what /me sees — no secret values exposed
+    const cookieCount = Object.keys(req.cookies || {}).length;
+    console.log(`[/me] cookieCount=${cookieCount} sessionID=${req.sessionID?.slice(0,8)}… userId=${req.session?.userId ?? 'NONE'}`);
     if (!req.session?.userId) {
       res.status(401).json({ success: false, error: 'Unauthorized' });
       return;
